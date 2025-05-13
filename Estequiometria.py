@@ -1,90 +1,68 @@
-# Definimos las masas molares de algunos elementos comunes
+import streamlit as st
+import re
+
+# Configuración de la página
+st.set_page_config(page_title="⚗️ Estequiometría Simple", layout="centered")
+st.title("⚗️ Calculadora Estequiométrica Interactiva")
+
+# Masas molares simples
 masas_molares = {
     "H": 1.008, "O": 16.00, "C": 12.01, "N": 14.01,
     "Cl": 35.45, "Na": 22.99, "K": 39.10, "Mg": 24.31,
     "Ca": 40.08, "S": 32.07, "Fe": 55.85, "Zn": 65.38
 }
 
-# Función para analizar una fórmula química y obtener la cantidad de átomos por elemento
-def parse_formula(formula):
-    import re
-    elementos = re.findall(r'([A-Z][a-z]*)(\d*)', formula)
-    resultado = {}
-    for elemento, cantidad in elementos:
-        cantidad = int(cantidad) if cantidad else 1
-        resultado[elemento] = resultado.get(elemento, 0) + cantidad
-    return resultado
-
-# Función para calcular la masa molar de una fórmula
+# Función para calcular masa molar desde fórmula como H2O o CO2
 def calcular_masa_molar(formula):
-    elementos = parse_formula(formula)
-    return sum(masas_molares.get(el, 0) * cant for el, cant in elementos.items())
+    elementos = re.findall(r'([A-Z][a-z]*)(\d*)', formula)
+    masa_total = 0
+    for el, num in elementos:
+        num = int(num) if num else 1
+        masa_total += masas_molares.get(el, 0) * num
+    return masa_total
 
-# Función para calcular los gramos de una sustancia a partir de la reacción química
-def calcular_gramos(reactivos, productos, coef_reactivos, coef_productos, sust_dada, gramos_dados, sust_obj):
-    # Encontrar el índice de las sustancias en la lista de reactivos y productos
-    sustancias = reactivos + productos
-    idx_dada = sustancias.index(sust_dada)
-    idx_obj = sustancias.index(sust_obj)
+# Paso 1: Selección de sustancias
+st.subheader("Paso 1: Selecciona dos sustancias")
+elementos = list(masas_molares.keys())
 
-    # Calcular la masa molar de las sustancias
-    masa_dada = calcular_masa_molar(sust_dada)
-    masa_obj = calcular_masa_molar(sust_obj)
+col1, col2 = st.columns(2)
+with col1:
+    elemento1 = st.radio("Sustancia conocida:", elementos)
+with col2:
+    elemento2 = st.radio("Sustancia a calcular:", [e for e in elementos if e != elemento1])
 
-    # Calcular los moles de la sustancia dada
-    moles_dada = gramos_dados / masa_dada
+# Subíndices de las sustancias
+col3, col4 = st.columns(2)
+with col3:
+    sub1 = st.slider(f"Subíndice de {elemento1}:", 1, 6, 1)
+with col4:
+    sub2 = st.slider(f"Subíndice de {elemento2}:", 1, 6, 1)
 
-    # Calcular la proporción estequiométrica entre los coeficientes
-    proporcion = coef_productos[idx_obj - len(reactivos)] / coef_reactivos[idx_dada]
-    moles_obj = moles_dada * proporcion
+# Coeficientes balanceados
+st.subheader("Paso 2: Ajusta los coeficientes balanceados")
+col5, col6 = st.columns(2)
+with col5:
+    coef1 = st.slider(f"Coeficiente de {elemento1}{sub1 if sub1 > 1 else ''}:", 1, 10, 1)
+with col6:
+    coef2 = st.slider(f"Coeficiente de {elemento2}{sub2 if sub2 > 1 else ''}:", 1, 10, 1)
 
-    # Calcular los gramos de la sustancia a calcular
-    gramos_obj = moles_obj * masa_obj
+# Paso 3: Ingreso de gramos conocidos
+st.subheader("Paso 3: Ingresa los gramos de la sustancia conocida")
+gramos_conocidos = st.number_input(f"Gramos de {elemento1}{sub1 if sub1 > 1 else ''}:", min_value=0.0, step=0.1)
 
-    return gramos_obj
+# Botón de cálculo
+if st.button("📊 Calcular"):
+    formula1 = f"{elemento1}{sub1 if sub1 > 1 else ''}"
+    formula2 = f"{elemento2}{sub2 if sub2 > 1 else ''}"
 
-# Función principal
-def main():
-    print("⚗️ Bienvenido a la aplicación de Cálculo Estequiométrico ⚗️")
-    print("--------------------------------------------------------")
+    masa1 = calcular_masa_molar(formula1)
+    masa2 = calcular_masa_molar(formula2)
 
-    # Entrada de reactivos y productos
-    reactivos = input("Ingrese los reactivos (separados por coma, ej: H2, O2): ").replace(" ", "").split(",")
-    productos = input("Ingrese los productos (separados por coma, ej: H2O): ").replace(" ", "").split(",")
+    moles1 = gramos_conocidos / masa1
+    proporcion = coef2 / coef1
+    moles2 = moles1 * proporcion
+    gramos2 = moles2 * masa2
 
-    # Coeficientes balanceados (debes ingresarlos manualmente, por ejemplo, para la ecuación H2 + O2 → H2O)
-    print("\n⚠️ Ingrese los coeficientes balanceados para la ecuación química.")
-    print("Por ejemplo, para H2 + O2 → H2O, ingresa: 2 1 2 (correspondiente a 2 H2 + 1 O2 → 2 H2O)")
-
-    coef_entrada = input(f"Ingrese los coeficientes balanceados para las sustancias: {reactivos + productos}: ")
-    coef_balanceados = list(map(int, coef_entrada.split()))
-
-    # Separar los coeficientes en reactivos y productos
-    coef_reactivos = coef_balanceados[:len(reactivos)]
-    coef_productos = coef_balanceados[len(reactivos):]
-
-    # Mostrar la ecuación balanceada
-    ecuacion = " + ".join(f"{c} {r}" for c, r in zip(coef_reactivos, reactivos))
-    ecuacion += " → "
-    ecuacion += " + ".join(f"{c} {p}" for c, p in zip(coef_productos, productos))
-
-    print("\nEcuación balanceada:")
-    print(ecuacion)
-
-    # Cálculo estequiométrico
-    sustancias = reactivos + productos
-    sust_dada = input(f"Seleccione la sustancia conocida (en gramos) de las siguientes: {sustancias}: ")
-    gramos_dados = float(input(f"Ingrese la cantidad (g) de {sust_dada}: "))
-    sust_obj = input(f"Seleccione la sustancia a calcular (en gramos) de las siguientes: {sustancias} (excepto {sust_dada}): ")
-
-    # Realizamos los cálculos
-    gramos_obj = calcular_gramos(
-        reactivos, productos, coef_reactivos, coef_productos, sust_dada, gramos_dados, sust_obj
-    )
-
-    print("\n📊 Resultado:")
-    print(f"- Gramos de {sust_obj}: {gramos_obj:.2f} g")
-
-# Ejecutar la función principal
-if __name__ == "__main__":
-    main()
+    st.success(f"🔬 Resultado:\n\n"
+               f"- Moles de {formula1}: {moles1:.4f} mol\n"
+               f"- Gramos de {formula2} producidos: **{gramos2:.2f} g**")
